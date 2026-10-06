@@ -39,7 +39,7 @@ services:
       sh -c '
         echo "Resolving database host...";
         getent hosts db || true;
-        until nc -z db 5432; do
+        until node -e "const net=require("net"); const s=net.createConnection({host:"db",port:5432},()=>{s.end();process.exit(0)}); s.on("error",()=>process.exit(1)); setTimeout(()=>process.exit(1),2000);"; do
           echo "Waiting for TCP connection to db:5432...";
           sleep 2;
         done;
