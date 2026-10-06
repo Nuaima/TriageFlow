@@ -5,8 +5,8 @@ services:
       POSTGRES_DB: triageflow
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    expose:
-      - "5432"
+    ports:
+      - "5432:5432"
     volumes:
       - triageflow_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -14,13 +14,10 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
-    networks:
-      triageflow_net:
-        aliases:
-          - db
 
   api:
     build: .
+    profiles: ["full"]
     depends_on:
       db:
         condition: service_healthy
@@ -35,18 +32,12 @@ services:
     ports:
       - "3000:3000"
     restart: on-failure
-    networks:
-      - triageflow_net
     command: >
       sh -c "
         node scripts/wait-for-db.js &&
         npx prisma migrate deploy &&
         node dist/src/server.js
       "
-
-networks:
-  triageflow_net:
-    driver: bridge
 
 volumes:
   triageflow_pgdata:
