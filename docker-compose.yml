@@ -5,15 +5,15 @@ services:
       POSTGRES_DB: triageflow
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - triageflow_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d triageflow"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d triageflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   api:
     build: .
@@ -28,7 +28,15 @@ services:
       JWT_EXPIRES_IN: 1h
     ports:
       - "3000:3000"
-    command: sh -c "npx prisma migrate deploy && node dist/src/server.js"
+    restart: on-failure
+    command: >
+      sh -c '
+        until npx prisma migrate deploy; do
+          echo "Database not ready for Prisma yet; retrying in 2s...";
+          sleep 2;
+        done;
+        node dist/src/server.js
+      '
 
 volumes:
   triageflow_pgdata:
