@@ -14,6 +14,10 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+    networks:
+      triageflow_net:
+        aliases:
+          - db
 
   api:
     build: .
@@ -23,20 +27,32 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/triageflow?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/triageflow?schema=public&connect_timeout=10
       JWT_SECRET: local-docker-secret-change-me
       JWT_EXPIRES_IN: 1h
     ports:
       - "3000:3000"
     restart: on-failure
+    networks:
+      - triageflow_net
     command: >
       sh -c '
+        echo "Resolving database host...";
+        getent hosts db || true;
+        until nc -z db 5432; do
+          echo "Waiting for TCP connection to db:5432...";
+          sleep 2;
+        done;
         until npx prisma migrate deploy; do
-          echo "Database not ready for Prisma yet; retrying in 2s...";
+          echo "Database reachable but Prisma migration failed; retrying in 2s...";
           sleep 2;
         done;
         node dist/src/server.js
       '
+
+networks:
+  triageflow_net:
+    driver: bridge
 
 volumes:
   triageflow_pgdata:
