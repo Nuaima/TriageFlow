@@ -18,6 +18,12 @@ const updateTicketSchema = z.object({
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional()
 }).refine(value => Object.keys(value).length > 0, "At least one field is required");
 
+function getParam(value: string | string[] | undefined, name: string): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && value.length > 0) return value[0];
+  throw new AppError(`Missing route parameter: ${name}`, 400, "INVALID_ROUTE_PARAM");
+}
+
 export async function createTicket(req: Request, res: Response, next: NextFunction) {
   try {
     const data = createTicketSchema.parse(req.body);
@@ -58,7 +64,8 @@ export async function listTickets(req: Request, res: Response, next: NextFunctio
 
 export async function getTicket(req: Request, res: Response, next: NextFunction) {
   try {
-    const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+    const id = getParam(req.params.id, "id");
+    const ticket = await prisma.ticket.findUnique({ where: { id } });
     if (!ticket) throw new AppError("Ticket not found", 404, "TICKET_NOT_FOUND");
     res.json({ data: ticket });
   } catch (error) {
@@ -68,11 +75,12 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
 
 export async function updateTicket(req: Request, res: Response, next: NextFunction) {
   try {
+    const id = getParam(req.params.id, "id");
     const data = updateTicketSchema.parse(req.body);
-    const exists = await prisma.ticket.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    const exists = await prisma.ticket.findUnique({ where: { id }, select: { id: true } });
     if (!exists) throw new AppError("Ticket not found", 404, "TICKET_NOT_FOUND");
 
-    const ticket = await prisma.ticket.update({ where: { id: req.params.id }, data });
+    const ticket = await prisma.ticket.update({ where: { id }, data });
     res.json({ data: ticket });
   } catch (error) {
     next(error);
@@ -81,10 +89,11 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
 
 export async function deleteTicket(req: Request, res: Response, next: NextFunction) {
   try {
-    const exists = await prisma.ticket.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    const id = getParam(req.params.id, "id");
+    const exists = await prisma.ticket.findUnique({ where: { id }, select: { id: true } });
     if (!exists) throw new AppError("Ticket not found", 404, "TICKET_NOT_FOUND");
 
-    await prisma.ticket.delete({ where: { id: req.params.id } });
+    await prisma.ticket.delete({ where: { id } });
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -93,7 +102,8 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
 
 export async function triage(req: Request, res: Response, next: NextFunction) {
   try {
-    const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+    const id = getParam(req.params.id, "id");
+    const ticket = await prisma.ticket.findUnique({ where: { id } });
     if (!ticket) throw new AppError("Ticket not found", 404, "TICKET_NOT_FOUND");
 
     const result = triageTicket(ticket.subject, ticket.description);
